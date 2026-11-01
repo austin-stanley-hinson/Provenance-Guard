@@ -344,6 +344,8 @@ imitate plain writing. It is *not* verified human writing, which is why
 criterion 1 has to be tested on real human samples. The human calibration
 texts are real r/csmajors comments from TakeMeter.
 
+**Time spent (unit 7):** 5 hours.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
