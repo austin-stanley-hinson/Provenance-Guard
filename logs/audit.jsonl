@@ -1,0 +1,11 @@
+{"timestamp": "2026-11-01T15:40:22+00:00", "content_id": "5b79e9ea-2ea8-47e5-a6c3-9277bfacc8db", "creator_id": "austin", "guess": "pending", "model_score": 0.7901, "style_score": null, "combined_score": null, "label": "PLACEHOLDER: labels arrive in Milestone 5.", "status": "decided"}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "austin", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "austin", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "austin", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "austin", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "invalid_json", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "invalid_json", "http_status": 400}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "austin", "event": "rejected", "status": "rejected", "reason": "text_too_short", "http_status": 422}
+{"timestamp": "2026-11-01T15:40:23+00:00", "creator_id": "austin", "event": "rejected", "status": "rejected", "reason": "text_too_long", "http_status": 413}
+{"timestamp": "2026-11-01T15:40:23+00:00", "content_id": "80d3048b-9886-4f27-a25e-8c4875314f1b", "creator_id": "austin", "guess": "pending", "model_score": 0.9973, "style_score": null, "combined_score": null, "label": "PLACEHOLDER: labels arrive in Milestone 5.", "status": "decided"}

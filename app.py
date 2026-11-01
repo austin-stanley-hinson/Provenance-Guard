@@ -199,17 +199,89 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    import detector
 
-    # TODO: delete this and build the route.
+    # ── Step 2 of the trace: check the input before anything expensive runs.
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _reject(400, "invalid_json",
+                       "Send a JSON object like {\"text\": \"...\", \"creator_id\": \"...\"}.")
+
+    creator_id = payload.get("creator_id")
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return _reject(400, "missing_field",
+                       "`creator_id` is required and must be a non-empty string.",
+                       creator_id=creator_id)
+
+    text = payload.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return _reject(400, "missing_field",
+                       "`text` is required and must be a non-empty string.",
+                       creator_id=creator_id)
+
+    if len(text) > config.MAX_TEXT_CHARS:
+        return _reject(413, "text_too_long",
+                       f"`text` is {len(text):,} characters. The limit is "
+                       f"{config.MAX_TEXT_CHARS:,}.",
+                       creator_id=creator_id)
+
+    # ── Step 3: the handle that ties the decision, the log and any appeal together.
+    content_id = str(uuid.uuid4())
+
+    # ── Step 4: signal one.
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError:
+        return _reject(422, "text_too_short",
+                       "This is too short to judge. Send at least a few sentences.",
+                       creator_id=creator_id)
+    except detector.DetectorUnavailable:
+        return _reject(503, "detector_unavailable",
+                       "The detector model isn't available right now. Try again later.",
+                       creator_id=creator_id)
+
+    # ── Steps 5–6 come in Milestones 4 and 5. Until then the style signal,
+    # combined score and label are placeholders, and say so.
+    style_score = None
+    combined_score = None
+    guess = "pending"
+    confidence = None
+    label = "PLACEHOLDER: labels arrive in Milestone 5."
+
+    # ── Step 7: write it down, then answer.
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": confidence,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+        "combined_score": combined_score,
+        "status": "decided",
+    })
+
+
+def _reject(status: int, error: str, message: str, creator_id=None):
+    """
+    Refuse a request, and leave a trace of the refusal in the audit log.
+
+    The `creator_id` is logged only if it was a usable string. A refusal is not
+    a decision, so nothing here creates a content_id (criterion 5).
+    """
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        creator_id = "unknown"
+    audit.log_rejection(creator_id=creator_id, reason=error, http_status=status)
+    return jsonify({"error": error, "message": message}), status
 
 
 @app.post("/appeal")
