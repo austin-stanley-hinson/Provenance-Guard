@@ -42,63 +42,49 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. False Positive Rate
 
-<!-- Your criterion. It must name a number. -->
+Out of 20 samples of verified human-written text, no more than 1 (5%) should receive a high-confidence AI label.
 
-
-
-**Why this target:**
-
-
+**Why this target:** Falsely accusing someone of using AI could damage their credibility. I'd rather have the system return "unsure" than confidently make the wrong accusation.
 
 ---
 
-## 2.
+## 2. Confidence Score Separation
 
-<!-- Your criterion. -->
+Across a test set of 10 human-written and 10 AI-generated samples, the average AI-likelihood score for AI-generated text should be at least 0.25 higher than the average score for human-written text.
 
-
-
-**Why this target:**
-
-
+**Why this target:** The two signals should produce meaningful differences between writing samples rather than returning similar scores for everything. A 0.25 gap gives me a measurable target without expecting perfect detection.
 
 ---
 
-## 3.
+## 3. Label Coverage and Thresholds
 
-<!-- Your criterion. -->
+Every valid confidence score between 0 and 1 must map to exactly one of three labels:
 
+- **0.00–0.20:** High-confidence human
+- **Above 0.20 and below 0.80:** Unsure
+- **0.80–1.00:** High-confidence AI
 
+All three labels must be reachable through testing, with no scores left unclassified.
 
-**Why this target:**
-
-
-
----
-
-## 4.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** I'm deliberately keeping the unsure range wide because the consequences of a false accusation are greater than those of missing AI-generated content. The system should only make strong claims when the score is sufficiently convincing.
 
 ---
 
-## 5.
+## 4. Appeal Handling
 
-<!-- Your criterion. -->
+For 10 valid appeals submitted through `POST /appeal`, all 10 must be recorded with their `content_id` and reasoning, update the corresponding content status to `under_review`, and return a confirmation response.
 
+**Why this target:** Writers should have a reliable way to challenge a classification. An appeal should never silently disappear, especially when someone's work has been incorrectly flagged.
 
+---
 
-**Why this target:**
+## 5. Invalid Input Handling
 
+The `POST /submit` endpoint must reject 100% of tested invalid requests, including missing `text`, empty or whitespace-only text, missing `creator_id`, and text exceeding 10,000 characters. Each must return HTTP 400 or 413 with a clear JSON error message, without crashing the service or storing the submission.
 
+**Why this target:** Bad inputs shouldn't break the service or produce misleading classifications. A defined text limit also prevents excessively large submissions from consuming unnecessary processing resources.
 
 ---
 
