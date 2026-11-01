@@ -60,7 +60,7 @@ Across a test set of 10 human-written and 10 AI-generated samples, the average A
 
 ## 3. Label Coverage and Thresholds
 
-Every valid confidence score between 0 and 1 must map to exactly one of three labels:
+Every valid combined score between 0 and 1 (0 = confidently human, 1 = confidently AI) must map to exactly one of three labels:
 
 - **0.00–0.20:** High-confidence human
 - **Above 0.20 and below 0.80:** Unsure
@@ -82,7 +82,7 @@ For 10 valid appeals submitted through `POST /appeal`, all 10 must be recorded w
 
 ## 5. Invalid Input Handling
 
-The `POST /submit` endpoint must reject 100% of tested invalid requests, including missing `text`, empty or whitespace-only text, missing `creator_id`, and text exceeding 10,000 characters. Each must return HTTP 400 or 413 with a clear JSON error message, without crashing the service or storing the submission.
+The `POST /submit` endpoint must reject 100% of tested invalid requests, including missing `text`, empty or whitespace-only text, missing `creator_id`, and text exceeding 10,000 characters. Each must return HTTP 400 or 413 with a clear JSON error message, without crashing the service or creating a decision or classification for it (a `rejected` entry in the audit log is expected).
 
 **Why this target:** Bad inputs shouldn't break the service or produce misleading classifications. A defined text limit also prevents excessively large submissions from consuming unnecessary processing resources.
 
