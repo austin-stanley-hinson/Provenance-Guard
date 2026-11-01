@@ -249,9 +249,8 @@ def submit():
     combined_score = scoring.combine_signals(model_score, style_score, text=text)
     confidence = round(abs(combined_score - 0.5) * 2, 4)
 
-    # The label is Milestone 5. Until then it's a placeholder, and says so.
-    guess = "pending"
-    label = "PLACEHOLDER: labels arrive in Milestone 5."
+    # ── Still step 6: the number becomes words a person can read.
+    guess, label = scoring.score_to_label(combined_score)
 
     # ── Step 7: write it down, then answer.
     audit.log_decision(
@@ -276,7 +275,7 @@ def submit():
     })
 
 
-def _reject(status: int, error: str, message: str, creator_id=None):
+def _reject(status: int, error: str, message: str, creator_id=None, **extra):
     """
     Refuse a request, and leave a trace of the refusal in the audit log.
 
@@ -285,7 +284,7 @@ def _reject(status: int, error: str, message: str, creator_id=None):
     """
     if not isinstance(creator_id, str) or not creator_id.strip():
         creator_id = "unknown"
-    audit.log_rejection(creator_id=creator_id, reason=error, http_status=status)
+    audit.log_rejection(creator_id=creator_id, reason=error, http_status=status, **extra)
     return jsonify({"error": error, "message": message}), status
 
 
@@ -309,14 +308,58 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _reject(400, "invalid_json",
+                       "Send a JSON object like {\"content_id\": \"...\", \"reasoning\": \"...\"}.",
+                       endpoint="appeal")
 
-    # TODO: delete this and build the route.
+    content_id = payload.get("content_id")
+    if not isinstance(content_id, str) or not content_id.strip():
+        return _reject(400, "missing_field",
+                       "`content_id` is required. It's in the response you got when you submitted.",
+                       endpoint="appeal")
+
+    reasoning = payload.get("reasoning")
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        return _reject(400, "missing_field",
+                       "`reasoning` is required. Tell us in your own words why you think the label is wrong.",
+                       endpoint="appeal")
+
+    if len(reasoning) > config.MAX_REASONING_CHARS:
+        return _reject(413, "reasoning_too_long",
+                       f"`reasoning` is {len(reasoning):,} characters. The limit is "
+                       f"{config.MAX_REASONING_CHARS:,}.",
+                       endpoint="appeal")
+
+    # The appeal has to point at a real decision. A typo'd id gets a clear 404,
+    # not a silent success.
+    content_id = content_id.strip()
+    decision = next((e for e in audit.entries_for(content_id)
+                     if e.get("status") == "decided"), None)
+    if decision is None:
+        return _reject(404, "unknown_content_id",
+                       f"We couldn't find a submission with content_id '{content_id}'. "
+                       "Check it matches the one from your submission response.",
+                       endpoint="appeal")
+
+    # creator_id comes from the original decision, not the request, so an
+    # appeal can't be filed under someone else's name.
+    audit.log_appeal(
+        content_id=content_id,
+        creator_id=decision.get("creator_id", "unknown"),
+        reasoning=reasoning.strip(),
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": (
+            "Thanks, we've received your appeal. A person will review it. Until "
+            "then the original label stays as it is, and we've kept a record of "
+            "your reasons alongside it."
+        ),
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────

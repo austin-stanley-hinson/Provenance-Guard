@@ -51,6 +51,9 @@ DETECTOR_MAX_TOKENS = 400
 # room for a long essay or a chapter excerpt. Criterion 5 tests this number.
 MAX_TEXT_CHARS = 10_000
 
+# The longest `reasoning` /appeal accepts. 2,000 characters is a few paragraphs.
+MAX_REASONING_CHARS = 2_000
+
 
 # ─── Scoring (Milestone 4) ───────────────────────────────────────────────────
 # How much each signal counts toward the combined score.
@@ -80,8 +83,11 @@ DISAGREEMENT_GAP = 0.40
 # getting through. There is no setting that avoids the trade — only settings
 # that decide who pays for it.
 
-HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.65
+# Criterion 3: 0.00–0.20 human, above 0.20 and below 0.80 unsure, 0.80–1.00 AI.
+# The unsure band is deliberately wide. A wrong accusation costs a real writer
+# far more than a missed piece of AI text costs the site.
+HUMAN_THRESHOLD = 0.20
+AI_THRESHOLD = 0.80
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub
