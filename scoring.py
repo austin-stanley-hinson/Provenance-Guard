@@ -19,44 +19,55 @@ you claim, so that line should read `scoring.py::combine_signals`.
 import config
 
 
-def combine_signals(model_score: float, style_score: float) -> float:
+def combine_signals(model_score: float, style_score: float,
+                    text: str | None = None) -> float:
     """
-    Combine two 0–1 signals into one 0–1 score. ← TODO (Milestone 4)
+    Combine two 0–1 signals into one 0–1 score. 0.0 is confidently human, 1.0
+    is confidently AI. Both inputs point the same way: higher means more AI.
 
-    Both inputs point the same way: higher means more likely AI. Your output
-    should too.
+    The rule (written down first, in notes/milestone4.md):
+
+      1. **Equal-weight average.** WEIGHT_MODEL_SIGNAL × model +
+         WEIGHT_STYLE_SIGNAL × style, 0.5 each. The model signal is biased
+         against plain writers and the style signal is cheap to game, so
+         neither is trusted over the other.
+      2. **Disagreement means unsure.** If the signals are more than
+         DISAGREEMENT_GAP apart, the result is clamped into the unsure band.
+         Two methods pointing opposite ways is uncertainty, and one signal on
+         its own never produces a confident label.
+      3. **Too little text means unsure.** If `text` is given and is under
+         MIN_SENTENCES sentences or MIN_WORDS words, the result is also
+         clamped into the unsure band.
 
     Args:
-        model_score: from `detector.model_signal` — how predictable the text is.
-        style_score: from `stylometry.style_signal` — the shape of the text.
-
-    Returns:
-        A float from 0.0 (confidently human) to 1.0 (confidently AI).
-
-    ⚠️ **Write the rule down before you code it, and put the numbers in your
-    README.** A weighted average is the obvious choice and it is not the only
-    one. Things worth thinking about:
-
-      - **What happens when they disagree?** One signal at 0.9 and the other at
-        0.1 averages to 0.5 — "unsure". Is that what you want? It might be
-        exactly right: two methods disagreeing IS uncertainty. Or you might
-        decide one signal is more trustworthy when they split.
-
-      - **Which way do you want to be wrong?** Weighting toward the signal that
-        reads more human means fewer false accusations and more AI text
-        getting through. There's no weighting that avoids the trade.
-
-      - Milestone 4 asks you to find a case where your two signals split and
-        write it down. That case is what this rule exists to handle.
-
-    The weights in config.py are placeholders. Change them, or ignore them and
-    write a different rule.
+        model_score: from `detector.model_signal`.
+        style_score: from `stylometry.style_signal`.
+        text: optional. Pass it so rule 3 can apply. /submit always does.
     """
-    # TODO: replace this
-    return (
+    combined = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+
+    disagree = abs(model_score - style_score) > config.DISAGREEMENT_GAP
+    too_short = text is not None and _too_short(text)
+    if disagree or too_short:
+        combined = _clamp_unsure(combined)
+
+    return round(min(max(combined, 0.0), 1.0), 4)
+
+
+def _too_short(text: str) -> bool:
+    import stylometry
+    return (len(stylometry._sentence_lengths(text)) < stylometry.MIN_SENTENCES
+            or len(stylometry.words(text)) < stylometry.MIN_WORDS)
+
+
+def _clamp_unsure(score: float) -> float:
+    """Pull a score just inside the unsure band, keeping which way it leaned."""
+    low = config.HUMAN_THRESHOLD + 0.01
+    high = config.AI_THRESHOLD - 0.01
+    return min(max(score, low), high)
 
 
 def score_to_label(score: float) -> tuple[str, str]:

@@ -200,6 +200,8 @@ def submit():
     a malformed input is one of the most common real failures there is.
     """
     import detector
+    import scoring
+    import stylometry
 
     # ── Step 2 of the trace: check the input before anything expensive runs.
     payload = request.get_json(silent=True)
@@ -240,12 +242,15 @@ def submit():
                        "The detector model isn't available right now. Try again later.",
                        creator_id=creator_id)
 
-    # ── Steps 5–6 come in Milestones 4 and 5. Until then the style signal,
-    # combined score and label are placeholders, and say so.
-    style_score = None
-    combined_score = None
+    # ── Step 5: signal two.
+    style_score = stylometry.style_signal(text)
+
+    # ── Step 6: one number, and how sure it is (distance from a coin flip).
+    combined_score = scoring.combine_signals(model_score, style_score, text=text)
+    confidence = round(abs(combined_score - 0.5) * 2, 4)
+
+    # The label is Milestone 5. Until then it's a placeholder, and says so.
     guess = "pending"
-    confidence = None
     label = "PLACEHOLDER: labels arrive in Milestone 5."
 
     # ── Step 7: write it down, then answer.
