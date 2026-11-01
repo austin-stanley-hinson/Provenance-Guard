@@ -282,17 +282,67 @@ not taken from the request.
 
 ## How I Used AI
 
-**Moment 1**
+**Moment 1: checking my own criteria against the contract**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* I wrote my five acceptance criteria myself and gave them
+  to Claude to put into `criteria.md`.
+- *What came back:* Claude pasted them in word for word, then flagged two
+  wording problems before Unit 8 freezes them. Criterion 3 said "confidence
+  score", but its 0.20 / 0.80 cutoffs apply to the combined score, and my
+  Milestone 1 contract uses `confidence` for a different number (distance from
+  a coin flip). Criterion 5 said invalid requests are rejected "without storing
+  the submission", but the plan was to log every rejection, which Unit 8
+  also asks for.
+- *What I changed:* I had Claude make both fixes. Criterion 3 now says
+  "combined score (0 = confidently human, 1 = confidently AI)", and criterion 5
+  says no decision or classification is created, with a `rejected` log entry
+  expected. The targets themselves are unchanged.
 
-**Moment 2**
+**Moment 2: the style signal ran the wrong way**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* to build the three style measures, write the combining
+  rule down before coding it, and calibrate on clearly AI, clearly human, plain
+  human and lightly edited AI text, using real r/csmajors comments from my
+  TakeMeter project as the human writing.
+- *What came back:* Vocabulary variety pointed the opposite way to the
+  starter's guess. AI text scored 0.88–0.94 on the type-token ratio and human
+  comments 0.76–0.95, because people repeat "I", "it" and their topic while
+  assistant prose avoids repeating itself. Flipping that measure is what keeps
+  the plainly written garden paragraph from Milestone 1 at unsure (0.68)
+  instead of near an accusation, even though the model signal alone gives it
+  0.79. Claude also caught two of its own overclaims: with equal weights and my
+  0.20 / 0.80 thresholds, the disagreement rule can't change a label on its
+  own, and the split case it first described as "held unsure by the rule" was
+  already unsure by its average.
+- *What I changed:* I kept the flipped direction and kept the disagreement
+  rule as a guard, with the README saying plainly that it doesn't change any
+  label today. Calibration ends up at 5 of 6 AI texts labelled AI and 0 of 24
+  human comments, with the caveat that the ramps were set from those same texts.
+
+**Moment 3: a 403 that wasn't my code**
+
+- *What I asked for:* to test `/submit` with curl after building it.
+- *What came back:* Every request, `/ping` included, returned 403. Claude
+  checked what was listening and found macOS Control Center (AirPlay Receiver)
+  also bound to port 5000. Later a stale Flask process kept answering with old
+  code because the kill command missed it (macOS lists it as `Python`).
+- *What I changed:* I chose to run on port 5050 (`PORT=5050 python app.py`)
+  instead of turning AirPlay off, so the Sample Run uses 5050 and says why.
+  Three log entries with `style_score: null` from the stale server are still
+  in `logs/audit.jsonl`, because the log is append-only.
+
+**What else Claude drafted (disclosure):** Claude wrote the Milestone 1 trace
+and endpoint contract (`notes/milestone1.md`), all the code for `/submit`,
+`/appeal`, `stylometry.py` and `scoring.py`, `calibrate.py`, the three label
+texts, and the README sections What This Does, Signals and Scoring, Label
+Variants and Sample Run. I read them and kept them as written.
+
+**Test text disclosure:** The six "clearly AI" and two "lightly edited AI"
+calibration texts in `calibration/texts.py` were written by Claude. The garden
+paragraph used in Milestone 1 and the Sample Run was also written by Claude to
+imitate plain writing. It is *not* verified human writing, which is why
+criterion 1 has to be tested on real human samples. The human calibration
+texts are real r/csmajors comments from TakeMeter.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
