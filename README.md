@@ -125,7 +125,8 @@ comma-spliced paragraph counts as one sentence.
 inside the unsure band. A confident label needs both signals pointing the
 same way and enough text to judge.
 
-**The numbers:** `WEIGHT_MODEL_SIGNAL = 0.5`, `WEIGHT_STYLE_SIGNAL = 0.5`,
+**The numbers:** `WEIGHT_MODEL_SIGNAL = 0.5`, `WEIGHT_STYLE_SIGNAL = 0.5` in unit 7,
+**changed to 0.3 / 0.7 in unit 8** as my one improvement (see The Improvement),
 `DISAGREEMENT_GAP = 0.40` (all in `config.py`). `MIN_SENTENCES = 3`,
 `MIN_WORDS = 50` (in `stylometry.py`). Calibration (`python calibrate.py`):
 clearly AI averages 0.845 (5 of 6 at or above 0.80), real human comments
@@ -141,7 +142,7 @@ a coin flip, style confident it's human. The average, 0.31, is unsure. The gap
 weights shifted toward style. Style alone would have called it human. The
 average keeps either signal from deciding on its own.
 
-One honest note: with equal weights and thresholds of 0.20 / 0.80, an average
+One honest note (true for the unit 7 weights): with equal weights and thresholds of 0.20 / 0.80, an average
 of 0.80 or more already requires both signals to be at least 0.60. So the
 disagreement rule can't change a label by itself today. It's kept as a guard
 for when the weights or thresholds change. The short-text rule does change
@@ -882,22 +883,155 @@ doesn't recognise it as AI. Two (EV07, EV08) are the short-text rule. Three
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** One line pair in `config.py`: `WEIGHT_MODEL_SIGNAL` 0.5 → **0.3**
+and `WEIGHT_STYLE_SIGNAL` 0.5 → **0.7**. Nothing else moved. Same thresholds
+(0.20 / 0.80), same disagreement rule (0.40), same short-text rule, same
+labels. I committed the change (`41d7acf`) before running anything against it,
+and picked 0.3 / 0.7 without trying other values on the attack set.
 
-**Which diagnosis pointed at it:**
+**Which diagnosis pointed at it:** Pattern 1. Signal one gave the clean staff
+AI paragraph only 0.669 but gave five real human false-positive texts
+0.80–0.88. It was both the false-positive risk and the reason AI text sat just
+0.014 above the line. Trusting it less should push careful human writing down
+and, where style still reads AI, push AI text up. The known cost from pattern
+2: style is the cheap-to-change signal, so shape attacks should get a little
+stronger.
 
 ### Attack Run — After
 
 <!-- Same format. `run_attacks.py --label after` -->
 
+`PORT=5050 python run_attacks.py --set attack_set --label after`, all 56 inputs,
+no crashes. Full output: `results/attack_run_2026-11-09_2053_after.md`, with scores from
+`results/audit_extract_after.json`. Marked by the same rules as the before
+run. ⬅ marks a verdict that changed.
 
+| Family | Before (held / broke) | After (held / broke) |
+|---|---|---|
+| evasion | 1 / 9 | 1 / 9 |
+| false_positive | 8 / 0 | 8 / 0 |
+| prompt_injection | 6 / 0 | 6 / 0 |
+| malformed | 17 / 3 | 17 / 3 |
+| flood_same_creator | 12 / 0 | 12 / 0 |
+| **Total** | **44 / 12** | **44 / 12** |
+
+| ID | Family | Status | Before: guess, combined | After: guess | Model | Style | Combined | Before | After |
+|---|---|---|---|---|---|---|---|---|---|
+| EV01 | evasion | 200 | unsure 0.561 | unsure | 0.164 | 0.959 | 0.720 | BROKE | **BROKE** |
+| EV02 | evasion | 200 | unsure 0.477 | unsure | 0.594 | 0.359 | 0.430 | BROKE | **BROKE** |
+| EV03 | evasion | 200 | unsure 0.565 | unsure | 0.666 | 0.464 | 0.524 | BROKE | **BROKE** |
+| EV04 | evasion | 200 | unsure 0.750 | ai | 0.611 | 0.889 | 0.806 | BROKE | **HELD** ⬅ |
+| EV05 | evasion | 200 | unsure 0.314 | unsure | 0.321 | 0.307 | 0.311 | BROKE | **BROKE** |
+| EV06 | evasion | 200 | unsure 0.521 | unsure | 0.573 | 0.469 | 0.500 | BROKE | **BROKE** |
+| EV07 | evasion | 200 | unsure 0.543 | unsure | 0.586 | 0.500 | 0.526 | BROKE | **BROKE** |
+| EV08 | evasion | 200 | unsure 0.373 | unsure | 0.245 | 0.500 | 0.424 | BROKE | **BROKE** |
+| EV09 | evasion | 200 | unsure 0.619 | unsure | 0.704 | 0.534 | 0.585 | BROKE | **BROKE** |
+| EV10 | evasion | 200 | ai 0.823 | unsure | 0.979 | 0.667 | 0.760 | HELD | **BROKE** ⬅ |
+| FP01 | false_positive | 200 | unsure 0.543 | unsure | 0.618 | 0.470 | 0.514 | HELD | **HELD** |
+| FP02 | false_positive | 200 | unsure 0.686 | unsure | 0.739 | 0.633 | 0.665 | HELD | **HELD** |
+| FP03 | false_positive | 200 | unsure 0.709 | unsure | 0.805 | 0.614 | 0.671 | HELD | **HELD** |
+| FP04 | false_positive | 200 | unsure 0.710 | unsure | 0.833 | 0.586 | 0.660 | HELD | **HELD** |
+| FP05 | false_positive | 200 | unsure 0.702 | unsure | 0.800 | 0.603 | 0.662 | HELD | **HELD** |
+| FP06 | false_positive | 200 | unsure 0.641 | unsure | 0.881 | 0.401 | 0.545 | HELD | **HELD** |
+| FP07 | false_positive | 200 | unsure 0.608 | unsure | 0.882 | 0.333 | 0.498 | HELD | **HELD** |
+| FP08 | false_positive | 200 | unsure 0.411 | unsure | 0.322 | 0.500 | 0.447 | HELD | **HELD** |
+| PI01 | prompt_injection | 200 | unsure 0.481 | unsure | 0.463 | 0.500 | 0.489 | HELD | **HELD** |
+| PI02 | prompt_injection | 200 | unsure 0.352 | unsure | 0.204 | 0.500 | 0.411 | HELD | **HELD** |
+| PI03 | prompt_injection | 200 | unsure 0.514 | unsure | 0.594 | 0.434 | 0.482 | HELD | **HELD** |
+| PI04 | prompt_injection | 200 | unsure 0.418 | unsure | 0.500 | 0.336 | 0.385 | HELD | **HELD** |
+| PI05 | prompt_injection | 200 | unsure 0.570 | unsure | 0.640 | 0.500 | 0.542 | HELD | **HELD** |
+| PI06 | prompt_injection | 200 | unsure 0.528 | unsure | 0.558 | 0.497 | 0.515 | HELD | **HELD** |
+| MF01 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| MF02 | malformed | 422 | — — | — | — | — | — | HELD | **HELD** |
+| MF03 | malformed | 200 | unsure 0.250 | unsure | 0.000 | 0.500 | 0.350 | HELD | **HELD** |
+| MF04 | malformed | 200 | unsure 0.256 | unsure | 0.011 | 0.500 | 0.353 | BROKE | **BROKE** |
+| MF05 | malformed | 200 | unsure 0.749 | unsure | 0.998 | 0.500 | 0.649 | BROKE | **BROKE** |
+| MF06 | malformed | 200 | unsure 0.749 | unsure | 0.997 | 0.500 | 0.649 | BROKE | **BROKE** |
+| MF07 | malformed | 200 | unsure 0.703 | unsure | 0.906 | 0.500 | 0.622 | HELD | **HELD** |
+| MF08 | malformed | 413 | — — | — | — | — | — | HELD | **HELD** |
+| RQ01 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ02 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ03 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ04 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ05 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ06 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ07 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ08 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ09 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| RQ10 | malformed | 429 (400 alone) | — — | — | — | — | — | HELD | **HELD** |
+| RQ11 | malformed | 429 (400 alone) | — — | — | — | — | — | HELD | **HELD** |
+| RQ12 | malformed | 400 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_01 | flood_same_creator | 200 | unsure 0.264 | unsure | 0.029 | 0.500 | 0.359 | HELD | **HELD** |
+| FL01_02 | flood_same_creator | 200 | unsure 0.264 | unsure | 0.029 | 0.500 | 0.359 | HELD | **HELD** |
+| FL01_03 | flood_same_creator | 200 | unsure 0.264 | unsure | 0.029 | 0.500 | 0.359 | HELD | **HELD** |
+| FL01_04 | flood_same_creator | 200 | unsure 0.264 | unsure | 0.029 | 0.500 | 0.359 | HELD | **HELD** |
+| FL01_05 | flood_same_creator | 200 | unsure 0.264 | unsure | 0.029 | 0.500 | 0.359 | HELD | **HELD** |
+| FL01_06 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_07 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_08 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_09 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_10 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_11 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+| FL01_12 | flood_same_creator | 429 | — — | — | — | — | — | HELD | **HELD** |
+
+**My five criteria, after** (`PORT=5050 python run_eval.py --label after`,
+`run_appeal_eval.py --label after`):
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 1. Human writing labelled AI | ≤ 1 of 20 | 0/20 | 0/20 | 0/20 | MET |
+| 2. AI mean − human mean | ≥ 0.25 | 0.465 | 0.465 | 0.465 | MET |
+| 3. All three labels reached | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Appeals recorded, `under_review` | 10 of 10 | 10/10 | 10/10 | 10/10 | MET |
+| 5. Invalid input → 400/413, no decision | 5 of 5 | 4/5 | 4/5 | 4/5 | **MISSED** |
+
+**The criterion 5 miss, and the re-run.** In all three trials, the one request
+with no `creator_id` got a **429**, not a 400
+(`results/run_2026-11-09_2053_after.md`). With no creator_id, the rate limiter
+counts that request against my IP address, and I started this eval about 10
+seconds after the attack run, whose malformed rows had used up that address's 5
+per minute. **Stage: the rate limiter, in front of the route. Mechanism:
+requests without a creator_id share one per-address bucket.** The reweight
+can't affect it, and the before eval passed because it ran half an hour after
+its attack run. I re-ran the whole eval with nothing changed, on a freshly
+started service (which also resets the in-memory limiter):
+`results/run_2026-11-09_2054_after_rerun.md` gives **5/5, 5/5, 5/5**. I'm
+reporting both. The first run is a real finding: a legitimate but malformed
+request from a busy shared address gets "too many requests" instead of being
+told what's wrong with it.
 
 **Did it help, and how do I know:**
 
 <!-- Widening the unsure band usually fixes one problem and creates another.
      Reporting that trade honestly is worth full credit. -->
 
+**It helped the side I care about most, and didn't change the number that
+broke.**
 
+- **False positives: better.** Seven of the eight FP texts moved away from the
+  AI line. FP08 rose from 0.411 to 0.447: at 8 words its style is a fixed 0.5
+  (no opinion), which now counts for more, and it stays unsure by the short-text
+  rule. The worst case, FP03, went from 0.709 to **0.671**, and the
+  highest FP score went from 0.710 to 0.671. FP06 and FP07, which had the
+  highest signal-one scores (0.88), dropped by 0.10 and 0.11.
+- **Evasion: no net change, 9 broke before and after, but different ones.**
+  EV04 (rare words) is now caught: its style of 0.889 counts for more, 0.750 →
+  **0.806**. EV10 (repeated stanzas) now gets through: repeating whole stanzas
+  makes the vocabulary measure read human, so style is only 0.667, and with
+  signal one's 0.979 counting for less it fell from 0.823 to **0.760**. That's
+  the trade in one pair: weighting style up rewards the attacks that keep the
+  AI shape and punishes the ones that change it.
+- **The cost I predicted showed up.** The shape attacks scored *lower* (EV02
+  0.477 → 0.430, EV03 0.565 → 0.524, EV06 0.521 → 0.500). Criterion 2's
+  separation shrank slightly, from 0.479 to 0.465, because the casual human
+  comments' style scores now count for more.
+- **What didn't move.** Prompt injection still changed no labels. MF04–06 still
+  get a logged decision on text with no words, because that's the route, not
+  the weights.
+
+In one sentence: the reweight moved the worst false-positive 0.04 further
+from an accusation without catching any more AI text overall. On a writing site
+that's the right direction, but it isn't a fix for evasion.
 
 ---
 
