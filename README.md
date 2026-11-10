@@ -352,7 +352,7 @@ texts are real r/csmajors comments from TakeMeter.
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 per minute, 50 per day
 
 **Why those numbers and not others:**
 <!-- Think about two people: a real writer submitting their own work a few
@@ -360,16 +360,38 @@ texts are real r/csmajors comments from TakeMeter.
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
 
+A real writer submits a piece, maybe tweaks it and checks again. Even someone
+revising quickly is unlikely to send more than 5 in one minute, and 50 in a day
+is several pieces each checked many times. A script mapping my 0.20 / 0.80
+thresholds needs hundreds of near-identical variations. At 5 a minute it's
+stopped after 5 tries, and at 50 a day it would need weeks per creator_id. I
+went below the starter's 10 / 200 because nothing about a writing site needs
+10 checks a minute, and 200 a day is already enough to map a threshold roughly.
+
 **What a caller counts as:** <!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
 can look like one. -->
+
+Per `creator_id` when the request has one, and per IP address when it doesn't
+(`app.py::rate_limit_key`). That's fair to a household or classroom sharing one
+address. But `creator_id` is whatever the caller sends, so a script that makes up
+a new id for every request is never limited. That's the gap. A real deployment
+would key on a logged-in account, or add a per-address limit on top.
 
 **The run of status codes when I pushed past it:**
 
 <!-- python run_attacks.py --flood 15 -->
 
+`PORT=5050 python run_attacks.py --flood 15` (from `results/flood_2026-11-09_2007.md`):
+
+```
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
 ```
 
+Each of the 10 rejections is in `logs/audit.jsonl` as its own entry:
+
+```json
+{"creator_id": "flood_tester", "event": "rejected", "limit": "5 per 1 minute", "reason": "rate_limited", "status": "rejected", "timestamp": "2026-11-10T01:07:29+00:00"}
 ```
 
 ---

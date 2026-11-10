@@ -107,10 +107,15 @@ AI_THRESHOLD = 0.80
 # an hour, and a script sending a thousand variations to map your thresholds.
 # Your README has to say why your numbers and not others.
 
-RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+# On from unit 8. AI201_RATE_LIMITS=0 turns it off for a one-off local check.
+RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "1") == "1"
 
-RATE_LIMIT_PER_MINUTE = 10
-RATE_LIMIT_PER_DAY = 200
+# 5 a minute: a writer revising a piece can resubmit it a few times in a row,
+# but a script mapping the thresholds is stopped after 5 tries.
+# 50 a day: far above a real writer's day (a handful of pieces, each checked a
+# few times) and far below the hundreds of variations threshold-mapping needs.
+RATE_LIMIT_PER_MINUTE = 5
+RATE_LIMIT_PER_DAY = 50
 
 # Flask-Limiter warns loudly without this. In-memory is right for one laptop
 # and wrong for anything real — a restart forgets every count, and two copies
