@@ -490,7 +490,7 @@ Notes on the judgement calls:
   had used up. Sent alone a minute later
   (`results/attack_run_2026-11-09_2015_recheck_RQ10.md`, `…_RQ11.md`), both
   reach the route and get a 400 `invalid_json`.
-- **MF04, MF05, MF06** (only punctuation, one 60-character word, only emoji)
+- **MF04, MF05, MF06** (only punctuation, one 4,000-letter word, only emoji)
   each got a logged decision. Signal one scored the word and the emoji at
   0.997–0.998, near-certain AI, and only the short-text rule kept the label at
   unsure. A stored classification of text with no words in it is a broken
@@ -540,7 +540,7 @@ whose work got caught by it:
 **FP03, the non-native English speaker.** No real writer was labelled AI in this
 run, so the worst outcome is the nearest miss. FP03 is a careful, plain account
 of a first month in a new country. Signal one gave it **0.805**, higher than
-four of the six AI texts I calibrated with, and the combined score was
+two of the six AI texts I calibrated with (0.67 and 0.77), and the combined score was
 **0.709**. That is 0.09 from an accusation, and it was held off only by a style
 score of 0.61 and the deliberately wide unsure band. It's exactly the writer the
 Milestone 1 trace worried about, and the one with the least room to argue back.
