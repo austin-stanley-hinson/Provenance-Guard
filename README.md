@@ -576,6 +576,38 @@ criterion 2 is 10 texts Claude wrote for this run on new topics. 6 of the 20
 criterion 1 comments have under 3 sentences, so the short-text rule makes them
 unsure no matter what.
 
+**How I reached each verdict.** A criterion is MET only if the target holds in
+all three trials, not in the best one.
+
+1. **MET.** 0 of 20 in every trial, and the highest of the 20 combined scores
+   was 0.658, well under 0.80. This counts only the `ai` label, as the
+   criterion says, so near-misses don't count against it. But see the next
+   section: this target turned out to be easy.
+2. **MET.** The gap was 0.479 in every trial, nearly double the 0.25 target.
+   8 of 10 AI texts got the `ai` label and 2 got `unsure` (0.727 and 0.706).
+3. **MET.** `human`, `unsure` and `ai` all came back in every trial. The bands
+   meet with no gap: `scoring.score_to_label` gives 0.20 → human,
+   0.2001 → unsure, 0.80 → ai.
+4. **MET.** 30 of 30 appeals across the three trials returned 200 with
+   `under_review` and a message. Each one has an appeal entry in the log with
+   its exact reasoning, and that's the latest status for its content_id.
+5. **MET.** Every invalid request got a 400 or 413 with an `error` code and a
+   `message`, and the audit log has 0 decisions for those creator_ids. That
+   includes the one with no creator_id, which logged as `unknown`.
+
+**I held all five, so were the targets low?** Partly, yes, and the attack set
+shows where. Criterion 1 was the soft one. My 20 human texts were casual Reddit
+comments, which surprise GPT-2 (their highest signal-one score was 0.73). The
+staff's false-positive set is formal, plain and careful writing, and signal one
+gave five of those eight 0.80–0.88. FP03 reached 0.709 combined. Six of my 20
+comments were also under 3 sentences, so the short-text rule made them unsure
+automatically. **The criterion I'd tighten is 1:** the same "at most 1 of 20"
+target, but on human writing that is plain or formal on purpose (essays to a
+rubric, documentation, careful second-language writing), plus a second
+threshold, "none above 0.70", that would catch near-misses like FP03. None of my
+five criteria tests evasion either, which is where 9 of my 12 broken attacks
+are.
+
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
@@ -789,7 +821,62 @@ against `app.py::appeal`. Trial 1, piece 1.
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+No criterion missed, so these diagnoses cover the 12 broken attacks and the
+false-positive near-misses. I worked them out by scoring each attack text
+directly with the same functions `/submit` calls (`detector.perplexity`,
+`stylometry.style_parts`, `scoring.combine_signals`), without changing
+anything.
 
+**The baseline that explains most of it.** Most evasions are edits of one staff
+AI paragraph. With EV01's typos corrected by hand, that paragraph scores
+`model_score` **0.669** (perplexity 29), `style_score` 0.959, combined **0.814**.
+That's the `ai` label by just **0.014**.
+
+**Pattern 1: signal one ranks plain human writing as more AI-like than real AI
+text (stage: signal one).** It gives the clean AI paragraph 0.669, but it gives
+FP03, FP04, FP05, FP06 and FP07, all real human writing, **0.80–0.88**
+(perplexity 12.8–18.9). It's measuring how ordinary the words are, and careful
+human writing is more ordinary than this AI paragraph. Two consequences:
+
+- **AI text has almost no margin.** Because signal one gives AI text only about
+  0.67, an `ai` label needs signal two at about 0.93 or above. Any attack that
+  dents *either* signal a little breaks it. That's EV01–EV06 and EV09 below.
+- **The false-positive risk comes from this signal.** Every FP text that
+  reached 0.70 combined did it on a signal-one score of 0.80 or more.
+
+**Pattern 2: signal two is pure shape, and shape is cheap to change (stage:
+signal two).** Four attacks changed only the shape and pulled style from 0.959
+to 0.36–0.50.
+
+**Each broken attack:**
+
+| Attack | Stage | Mechanism (scores from the run) |
+|---|---|---|
+| EV01 typos | **signal one** | The attack aimed at signal two, but signal two didn't move (0.959; vocabulary variety was already at the AI end). Misspellings are tokens GPT-2 can't predict: perplexity went from 29 to **125** and `model_score` from 0.669 to **0.164**. Combined 0.561. |
+| EV02 broken-up sentences | **signal two** | 13 short sentences pushed length spread to 0.85, past the 0.60 human end of its ramp, so the spread part went 1.0 → 0. Style 0.359, combined 0.477. |
+| EV03 pasted quotation | **signal two** | The quote marks raised varied punctuation to 6.6 per 100 words, so the punctuation part went to 0, and the quotation's sentence lengths lowered the spread part to 0.39. Style 0.464, combined 0.565. |
+| EV04 unusual words | **signal one → combining rule** | Rare words raised perplexity a little (34), so `model_score` was 0.611. Style still said AI (0.889), but the average was 0.750. With signal one capped near 0.6–0.7 on this text, the 0.80 line is out of reach. |
+| EV05 heavy human edit | **both signals** | Rewritten with dashes, fragments and asides. Model 0.321, style 0.307. This is arguably human writing now; I don't count it as a fixable miss. |
+| EV06 one long, one short sentence | **signal two** | Spread hit 1.19, so the spread part went to 0. Style 0.469, combined 0.521. |
+| EV07 padding with punctuation | **signal two's sentence splitter → combining rule** | Every sentence was joined with "; and, moreover,". `stylometry._sentence_lengths` only splits on `. ! ?`, so 97 words counted as **1 sentence**. That trips the short-text rule (under 3 sentences), so style returns 0.5 and the result is held in unsure. The punctuation padding itself never mattered. |
+| EV08 below the token window | **combining rule (by design)** | 10 words and 2 sentences, so the short-text rule keeps it unsure. That's the trade I chose in Milestone 4: too little text to accuse anyone. |
+| EV09 human opening bolted on | **both signals (whole-text averaging)** | Both signals score the whole text as one block, so a casual human first paragraph dilutes the AI body. Model 0.704, style 0.534, combined 0.619. Nothing looks at sections separately. |
+| MF04 punctuation only | **route** | `/submit` accepts any non-blank string under 10,000 characters. The detector only refuses fewer than 3 tokens, and punctuation tokenizes fine, so a text with **0 words** got a decision. |
+| MF05 one 4,000-letter word | **route + signal one** | Same route gap. GPT-2 finds "aaaa…" perfectly predictable (perplexity **1.0**), so `model_score` 0.998, and only the short-text rule held it at unsure (0.749). |
+| MF06 emoji only | **route + signal one** | 0 words; perplexity 1.2, so `model_score` 0.997, held at unsure (0.749). Same gap. |
+
+**What held, and why it was close.** No false-positive text was labelled AI.
+FP02–FP05 (formal, second-language, rubric essay, documentation) all landed at
+0.69–0.71. Two things pushed them up: signal one (pattern 1), and the
+**punctuation part of signal two, which was 1.0 for all eight FP texts**. None
+of them used a semicolon, dash, bracket or contraction, because careful formal
+writers often don't. The vocabulary measure is what saved them: people repeat
+words, so the mattr part was 0–0.18. The 0.80 threshold did the rest.
+
+**One problem, not twelve.** Seven evasions (EV01–EV06, EV09) trace back to the
+same thing: the AI text starts only 0.014 above the line, because signal one
+doesn't recognise it as AI. Two (EV07, EV08) are the short-text rule. Three
+(MF04–06) are one missing check in the route.
 
 ---
 
