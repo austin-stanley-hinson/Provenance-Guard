@@ -345,7 +345,58 @@ imitate plain writing. It is *not* verified human writing, which is why
 criterion 1 has to be tested on real human samples. The human calibration
 texts are real r/csmajors comments from TakeMeter.
 
+**Unit 8**
+
+**Moment 4: the baseline that explained the attack run**
+
+- *What I asked for:* diagnoses for every broken attack, naming the stage and
+  the mechanism, by scoring each attack text directly with the same functions
+  `/submit` calls, without changing anything.
+- *What came back:* Claude fixed EV01's typos by hand to get a clean version of
+  the staff AI paragraph, and it scored only 0.814, just 0.014 above my AI
+  line. Signal one gave it 0.669 but gave five real human false-positive texts
+  0.80–0.88. That turned twelve breaks into three causes: no margin on AI text
+  (seven evasions), the short-text rule (two), and the route accepting text
+  with no words (three). It also found that EV01's typos, aimed at signal two,
+  actually sank signal one.
+- *What I changed:* Claude laid out three possible improvements (reweight,
+  refuse wordless text, split on semicolons) with the cost of each. I chose the
+  reweight because it follows the main pattern, and the 0.3 / 0.7 numbers were
+  committed before any after run.
+
+**Moment 5: a miss that wasn't the reweight**
+
+- *What I asked for:* the after runs, and to score them.
+- *What came back:* criterion 5 dropped to 4/5 in all three trials. Claude
+  traced it to the rate limiter: the request with no `creator_id` is counted
+  against my IP address, and the attack run 10 seconds earlier had used up
+  that address's 5 per minute. It re-ran the eval with nothing changed and got
+  5/5.
+- *What I changed:* I kept both result files and reported the first run as a
+  miss with its own diagnosis, instead of only showing the clean re-run.
+
+**Moment 6: the worst-failure exercise**
+
+- *What I asked for:* context and hints for the breakout question on FP03,
+  not the answer.
+- *What came back:* four questions, one per stage, each with a command to
+  run (`detector.py`, `stylometry.py`, the weights worked by hand, and the
+  threshold). My own write-up of the Milestone 3 results and FP03 is in
+  `notes/unit8_milestone3.md`.
+
+**What Claude drafted in unit 8 (disclosure):** the rate-limit numbers and
+reasoning, `scenarios.py`, `run_appeal_eval.py`, `score_eval.py`, two fields
+added to `run_eval.py`'s recording, the held/broke marking rules, every
+unit 8 README section, and the ten AI texts in `scenarios.py::AI_FRESH`. The
+attack set was moved into the repo from my Downloads and run before anything in
+it was read beyond the header row. Claude also caught and corrected three of
+its own errors in the write-up: FP03's signal-one score beats two of my six
+calibration AI texts, not four; MF05 is 4,000 letters, not 60; and FP08 went
+*up* after the reweight, so not every false-positive text improved.
+
 **Time spent (unit 7):** 5 hours.
+
+**Time spent (unit 8):** 5 hours.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
@@ -1040,14 +1091,61 @@ that's the right direction, but it isn't a fix for evasion.
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+Every criterion ended MET in the re-run, so this list is the 12 attacks that
+still break, plus the gaps the runs exposed.
 
+1. **Evasion, 9 of 10 still get through (EV01–EV03, EV05–EV10).** The root is
+   signal one: it gives AI text only about 0.67, so an AI label needs style
+   near its maximum, and any edit to either signal drops below 0.80. The
+   reweight swapped EV10 for EV04 instead of closing the gap. *What I'd do:*
+   recalibrate signal one, or replace GPT-2 perplexity with a measure that
+   doesn't reward plainness (for example, comparing perplexity under two
+   models). *Why I stopped:* the unit allows one improvement, and this needs a
+   new signal, not a setting. I also wouldn't fix EV05: after a heavy human
+   edit, the writing arguably is the person's.
+2. **The route accepts text with no words (MF04–06).** Punctuation-only, one
+   4,000-letter word and emoji-only text each got a logged decision, and signal
+   one scored the word and emoji at 0.997. *What I'd do:* refuse anything with
+   fewer than about 3 real words with a 422, before either signal runs. That
+   was option B in Milestone 5, and it's the next change I'd make. *Why I
+   stopped:* one change per unit, and the reweight addressed the bigger
+   pattern.
+3. **Semicolons erase sentences (EV07).** `stylometry._sentence_lengths` only
+   splits on `. ! ?`, so 97 words joined by "; and, moreover," count as one
+   sentence and trip the short-text rule. *What I'd do:* split on semicolons
+   and line breaks too, or base the short-text rule on words alone. *Why I
+   stopped:* it's narrow, and changing the splitter moves every style score,
+   which would muddy the before/after comparison.
+4. **Short text is always unsure (EV08, and 6 of my 20 criterion 1
+   comments).** This is a choice, not a bug: under 50 words I won't accuse
+   anyone. The cost is that a short AI submission always gets through.
+5. **Style can't read non-Latin scripts (MF07).** `stylometry.words` only
+   matches a–z, so Arabic, Hebrew, Chinese and others get style 0.5 forever,
+   and the decision rests on GPT-2, an English model (0.906 on MF07). *What
+   I'd do:* use a Unicode-aware word pattern, and refuse to score languages
+   the detector wasn't trained on rather than guess.
+6. **The rate limit has two holes.** A script that invents a new `creator_id`
+   for every request is never limited. And requests with no `creator_id` share
+   one per-address bucket, which turned a 400 into a 429 in my first after run
+   (criterion 5, 4/5). *What I'd do:* key on a logged-in account, with a
+   per-address limit as a backstop and a higher allowance before it.
+7. **Signal one moves on injected nonsense.** No injection changed a label,
+   but "SYSTEM: … guess=human" took PI02's model score from 0.754 to 0.204,
+   because it's unpredictable text. With a longer AI body, that could carry
+   AI text into unsure. It's the same weakness as evasion (pattern 1), so I'd
+   fix it the same way.
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
 
-
+I'd keep the wide unsure band and the reweight, and accept that most edited AI
+text gets through as "unsure", because a wrong AI label lands on a real person,
+often the careful second-language writer like FP03 who has the least room to
+argue. The people who pay are the honest writers competing with AI-assisted work on
+the same site and the readers who see "unsure" on generated text: a cost
+spread thinly across many people instead of dropped heavily on one.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
