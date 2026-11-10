@@ -20,3 +20,6 @@ Thumbs.db
 # NOTE: logs/ and results/ are deliberately NOT ignored. Your audit log and
 # your attack runs are evidence, and they're part of what gets graded.
 # Commit them.
+
+# The attack set zip (the unzipped attack_set/ folder is committed)
+attack_set.zip
