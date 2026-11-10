@@ -62,8 +62,12 @@ MAX_REASONING_CHARS = 2_000
 # down BEFORE you code it, and to put the numbers in your README. Whatever you
 # decide, it goes here.
 
-WEIGHT_MODEL_SIGNAL = 0.5
-WEIGHT_STYLE_SIGNAL = 0.5
+# Unit 8 improvement (the one change): 0.5 / 0.5 -> 0.3 / 0.7. The attack-set
+# diagnosis found signal one gives plain human writing 0.80-0.88 but the clean
+# staff AI paragraph only 0.669, so it was both the false-positive risk and the
+# reason AI text had no margin. Chosen before re-running anything.
+WEIGHT_MODEL_SIGNAL = 0.3
+WEIGHT_STYLE_SIGNAL = 0.7
 
 # If the two signals are further apart than this, combine_signals() keeps the
 # result in the unsure band: a confident label needs both signals to agree.
