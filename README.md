@@ -551,19 +551,226 @@ Milestone 1 trace worried about, and the one with the least room to argue back.
 
 <!-- Your five criteria across three trials. `run_eval.py --label before`. -->
 
+`PORT=5050 python run_eval.py --label before` for criteria 1, 2, 3 and 5
+(scenarios in `scenarios.py`), and `PORT=5050 python run_appeal_eval.py --label
+before` for criterion 4, because an appeal needs a content_id from a
+submission first and `run_eval.py` only sends `/submit`. Per-trial numbers come
+from `python score_eval.py results/run_2026-11-09_2044_before.md`.
+
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. Human writing labelled AI (20 unseen r/csmajors comments) | ≤ 1 of 20 | 0/20 | 0/20 | 0/20 | MET |
+| 2. AI mean − human mean, combined score (10 + 10) | ≥ 0.25 | 0.479 | 0.479 | 0.479 | MET |
+| 3. All three labels reached | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Appeals recorded, `under_review`, confirmed | 10 of 10 | 10/10 | 10/10 | 10/10 | MET |
+| 5. Invalid input → 400/413 + JSON error, no decision | 5 of 5 | 5/5 | 5/5 | 5/5 | MET |
+
+All three trials were identical, which is expected: neither signal has any
+randomness. Criterion 2's means were AI 0.828 and human 0.349 in every trial.
+For criterion 5, the audit log shows 0 decisions for any of its creator_ids.
+
+**What the test texts were.** Criterion 1 and the human half of criterion 2 are
+30 real r/csmajors comments from TakeMeter, 50+ words each, none of them used
+to set the style ramps (`eval_data/takemeter_unseen.json`). The AI half of
+criterion 2 is 10 texts Claude wrote for this run on new topics. 6 of the 20
+criterion 1 comments have under 3 sentences, so the short-text rule makes them
+unsure no matter what.
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
 
-```json
+From `results/run_2026-11-09_2044_before.md`, produced by `run_eval.py::main` against `app.py::submit`
+(scores from `detector.py::model_signal`, `stylometry.py::style_signal`,
+`scoring.py::combine_signals`, label from `scoring.py::score_to_label`). Trial 1.
 
+*Criterion 1:* the highest-scoring of the 20 human comments.
+
+```json
+{
+  "status": 200,
+  "content_id": "ae8ba077-ca6c-4d8b-b431-27770d451f67",
+  "guess": "unsure",
+  "combined_score": 0.6581,
+  "confidence": 0.3162,
+  "model_score": 0.4697,
+  "style_score": 0.8465,
+  "label": "We can't tell whether this was written by a person or with help from AI. That happens a lot, especially with short or plainly written pieces, and it isn't an accusation. If you'd like a person to take a look, you can ask for a review.",
+  "error": null,
+  "message": null,
+  "sent": "yep i worked in software for a retail company as my first tech job. su"
+}
+```
+
+*Criterion 2:* the first AI text and the first human comment.
+
+```json
+[
+  {
+    "status": 200,
+    "content_id": "039bb5f0-12e1-4689-ab2e-308e734b5c2a",
+    "guess": "ai",
+    "combined_score": 0.8266,
+    "confidence": 0.6532,
+    "model_score": 0.7825,
+    "style_score": 0.8707,
+    "label": "This shows strong signs of being written with AI. Our check can be wrong. If you wrote this yourself, you can ask for a review and a person will look at it.",
+    "error": null,
+    "message": null,
+    "sent": "Effective budgeting is a cornerstone of financial stability. By tracki"
+  },
+  {
+    "status": 200,
+    "content_id": "13959de8-98a8-4ad9-8fb8-7e4ba6610fd4",
+    "guess": "unsure",
+    "combined_score": 0.3378,
+    "confidence": 0.3244,
+    "model_score": 0.3423,
+    "style_score": 0.3333,
+    "label": "We can't tell whether this was written by a person or with help from AI. That happens a lot, especially with short or plainly written pieces, and it isn't an accusation. If you'd like a person to take a look, you can ask for a review.",
+    "error": null,
+    "message": null,
+    "sent": "I agree with this guy. Went to a career fair once and talked to a coup"
+  }
+]
+```
+
+*Criterion 3:* one input aimed at each band.
+
+```json
+[
+  {
+    "status": 200,
+    "content_id": "519deef9-9f52-4246-a356-81a517796b37",
+    "guess": "human",
+    "combined_score": 0.1676,
+    "confidence": 0.6648,
+    "model_score": 0.3192,
+    "style_score": 0.0161,
+    "label": "This looks like it was written by a person. If you think we got that wrong, you can ask for a review.",
+    "error": null,
+    "message": null,
+    "sent": "Totally agree. I don’t go to a T20 School, I don’t consider myself a ‘"
+  },
+  {
+    "status": 200,
+    "content_id": "2e6e2075-76ce-4fd6-96e4-4ce8ca3e2a94",
+    "guess": "unsure",
+    "combined_score": 0.6792,
+    "confidence": 0.3584,
+    "model_score": 0.7901,
+    "style_score": 0.5682,
+    "label": "We can't tell whether this was written by a person or with help from AI. That happens a lot, especially with short or plainly written pieces, and it isn't an accusation. If you'd like a person to take a look, you can ask for a review.",
+    "error": null,
+    "message": null,
+    "sent": "My grandmother had a garden behind her house. Every summer we picked t"
+  },
+  {
+    "status": 200,
+    "content_id": "d33ae649-f3c2-4e93-8d96-66315f190b3e",
+    "guess": "ai",
+    "combined_score": 0.8959,
+    "confidence": 0.7918,
+    "model_score": 0.941,
+    "style_score": 0.8508,
+    "label": "This shows strong signs of being written with AI. Our check can be wrong. If you wrote this yourself, you can ask for a review and a person will look at it.",
+    "error": null,
+    "message": null,
+    "sent": "Climate change is one of the most pressing issues facing our world tod"
+  }
+]
+```
+
+*Criterion 4:* from `results/appeal_run_2026-11-09_2044_before.md`, produced by `run_appeal_eval.py::run_trial`
+against `app.py::appeal`. Trial 1, piece 1.
+
+```json
+{
+  "piece": 1,
+  "submit_status": 200,
+  "content_id": "94de0b6d-c3d5-4ee2-85df-6a8f0a3f4de4",
+  "reasoning": "Trial 1, piece 1: I wrote this myself and would like a review.",
+  "appeal_status": 200,
+  "response": {
+    "content_id": "94de0b6d-c3d5-4ee2-85df-6a8f0a3f4de4",
+    "message": "Thanks, we've received your appeal. A person will review it. Until then the original label stays as it is, and we've kept a record of your reasons alongside it.",
+    "status": "under_review"
+  },
+  "logged_with_reasoning": true,
+  "latest_status": "under_review",
+  "passed": true
+}
+```
+
+*Criterion 5:* all five invalid requests.
+
+```json
+[
+  {
+    "status": 400,
+    "content_id": null,
+    "guess": null,
+    "combined_score": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "error": "missing_field",
+    "message": "`text` is required and must be a non-empty string.",
+    "sent": "{\"creator_id\": \"eval_bad_no_text\"}"
+  },
+  {
+    "status": 400,
+    "content_id": null,
+    "guess": null,
+    "combined_score": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "error": "missing_field",
+    "message": "`text` is required and must be a non-empty string.",
+    "sent": "(empty text)"
+  },
+  {
+    "status": 400,
+    "content_id": null,
+    "guess": null,
+    "combined_score": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "error": "missing_field",
+    "message": "`text` is required and must be a non-empty string.",
+    "sent": "   \n\t  "
+  },
+  {
+    "status": 400,
+    "content_id": null,
+    "guess": null,
+    "combined_score": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "error": "missing_field",
+    "message": "`creator_id` is required and must be a non-empty string.",
+    "sent": "{\"text\": \"Real writing with no creator attached to it.\"}"
+  },
+  {
+    "status": 413,
+    "content_id": null,
+    "guess": null,
+    "combined_score": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "error": "text_too_long",
+    "message": "`text` is 10,001 characters. The limit is 10,000.",
+    "sent": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+]
 ```
 
 **Diagnoses**

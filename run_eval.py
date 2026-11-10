@@ -121,11 +121,15 @@ def main():
                     payload = response.json() if response.content else {}
                     results.append({
                         "status": response.status_code,
+                        "content_id": payload.get("content_id"),
                         "guess": payload.get("guess"),
+                        "combined_score": payload.get("combined_score"),
                         "confidence": payload.get("confidence"),
                         "model_score": payload.get("model_score"),
                         "style_score": payload.get("style_score"),
                         "label": payload.get("label"),
+                        "error": payload.get("error"),
+                        "message": payload.get("message"),
                         "sent": preview,
                     })
                 except Exception as exc:  # noqa: BLE001
