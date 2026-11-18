@@ -24,14 +24,43 @@ Routes:
     GET  /health      is the service up, and is the model loaded
 """
 
+import time
 import uuid
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 
 import audit
 import config
 
 app = Flask(__name__)
+
+
+# ── Capstone instrumentation ──────────────────────────────────────────────────
+# Registered BEFORE the rate limiter below, so the clock is already running
+# when Flask-Limiter rejects a request — a 429 gets a real duration too.
+
+@app.before_request
+def _start_clock():
+    g.t0 = time.perf_counter()
+    g.cpu0 = time.process_time()
+
+
+def _timing(**stages) -> dict:
+    """
+    The fields every capstone log line carries, measured up to the moment of
+    logging: which route, how big the request was, wall time and CPU time.
+    `cpu_ms` is process CPU, so torch's extra threads count — that's the cost.
+    """
+    t0 = g.get("t0", time.perf_counter())
+    cpu0 = g.get("cpu0", time.process_time())
+    fields = {
+        "route": request.path,
+        "bytes_in": request.content_length,
+        "duration_ms": round((time.perf_counter() - t0) * 1000, 1),
+        "cpu_ms": round((time.process_time() - cpu0) * 1000, 1),
+    }
+    fields.update(stages)
+    return fields
 
 
 # ── Rate limiting — UNIT 8 ────────────────────────────────────────────────────
@@ -106,7 +135,9 @@ if config.RATE_LIMITING_ENABLED:
         audit.log_rejection(
             creator_id=payload.get("creator_id", "unknown"),
             reason="rate_limited",
+            http_status=429,
             limit=str(exc.description),
+            **_timing(),
         )
         return jsonify({
             "error": "rate_limited",
@@ -231,6 +262,7 @@ def submit():
     content_id = str(uuid.uuid4())
 
     # ── Step 4: signal one.
+    t_model = time.perf_counter()
     try:
         model_score = detector.model_signal(text)
     except ValueError:
@@ -242,8 +274,12 @@ def submit():
                        "The detector model isn't available right now. Try again later.",
                        creator_id=creator_id)
 
+    model_ms = round((time.perf_counter() - t_model) * 1000, 1)
+
     # ── Step 5: signal two.
+    t_style = time.perf_counter()
     style_score = stylometry.style_signal(text)
+    style_ms = round((time.perf_counter() - t_style) * 1000, 1)
 
     # ── Step 6: one number, and how sure it is (distance from a coin flip).
     combined_score = scoring.combine_signals(model_score, style_score, text=text)
@@ -261,6 +297,9 @@ def submit():
         style_score=style_score,
         combined_score=combined_score,
         label=label,
+        text_chars=len(text),
+        words=len(text.split()),
+        **_timing(model_ms=model_ms, style_ms=style_ms),
     )
 
     return jsonify({
@@ -284,7 +323,8 @@ def _reject(status: int, error: str, message: str, creator_id=None, **extra):
     """
     if not isinstance(creator_id, str) or not creator_id.strip():
         creator_id = "unknown"
-    audit.log_rejection(creator_id=creator_id, reason=error, http_status=status, **extra)
+    audit.log_rejection(creator_id=creator_id, reason=error, http_status=status,
+                        **extra, **_timing())
     return jsonify({"error": error, "message": message}), status
 
 
@@ -349,6 +389,7 @@ def appeal():
         content_id=content_id,
         creator_id=decision.get("creator_id", "unknown"),
         reasoning=reasoning.strip(),
+        **_timing(),
     )
 
     return jsonify({
