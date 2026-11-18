@@ -1321,7 +1321,7 @@ I used Claude Code for most of this unit, and here's exactly what it did:
 - **Criteria:** Claude gave me a menu of topics. **I picked the five topics; Claude proposed the numbers and the reasons; I approved them** before anything was run. They were committed as `3efa9b6`.
 - **Code:** Claude wrote the timing hook and fields in `app.py`, the `**extra` change in `audit.py`, `capstone_trial.py` and `gunicorn.conf.py`. It ran `test.py` (9/9 pass) and all six trials.
 - **Choosing the improvement:** Claude picked the cold-start change from the before-results, since it was the largest number.
-- **Writing:** Claude drafted the RUNNING.md capstone section and every section under this `## Capstone` heading.
+- **Writing:** Claude drafted the RUNNING.md capstone section and every section under this `## Capstone` heading. I reviewed all of them before submitting.
 - **Where I checked it:** Claude caught that Flask-Limiter's check runs before route code, so a 429 would have had no start time unless the clock hook was registered first. Claude also caught that running more than one worker would split the rate limiter's in-memory counts.
 
 **Stretch**
