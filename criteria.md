@@ -118,3 +118,42 @@ The `POST /submit` endpoint must reject 100% of tested invalid requests, includi
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+
+---
+
+## Capstone criteria
+
+Written before any capstone run. All five are about the extension (timing,
+cost, and logging under the gunicorn run path). A **trial** = start the service
+fresh with the RUNNING.md command, then send the same scripted batch: 1 first
+`/submit`, 10 warm `/submit`s of a ~150-word text, and 8 bad requests
+(2 invalid JSON, 2 missing field, 2 too long, 2 over the rate limit).
+
+**1. Warm latency.** After the model is loaded, the median `duration_ms` of the
+10 warm `/submit` requests is **≤ 500 ms**, in each of 3 trials.
+*Why:* a writer pressing "submit" should get an answer in well under a second;
+500 ms is roughly where a response stops feeling instant. Warm only: the first
+request is criterion 2.
+
+**2. Cold start.** The first `/submit` after a fresh start has
+`duration_ms` **≤ 10,000 ms**, in each of 3 trials.
+*Why:* the model loads on the first request. Past 10 s, a person assumes it's
+broken and resubmits, which also spends their rate limit.
+
+**3. Cost per run.** The median CPU time of a warm `/submit` (logged as
+`cpu_ms`, from `time.process_time()`) is **≤ 1,000 ms**, in each of 3 trials.
+*Why:* there's no API bill, so compute is the cost. One CPU-second per check
+means one core handles about 3,600 checks an hour, which is enough for a small
+writing site without buying more hardware.
+
+**4. Rejections are logged and cheap.** All 8 bad requests in a trial (100%)
+write a log line that includes `duration_ms`, and every one has
+`duration_ms` **≤ 50 ms**, in each of 3 trials.
+*Why:* a rejection should never touch the model. If one takes longer than
+50 ms, something expensive ran before the input was checked. An unlogged
+rejection is an attack I can't see.
+
+**5. The time is accounted for.** In every warm decision,
+`model_ms + style_ms` is **≥ 90%** of `duration_ms`, in each of 3 trials.
+*Why:* if the two signals don't explain where the time went, my stage
+breakdown is missing a stage, and any speed fix would be a guess.

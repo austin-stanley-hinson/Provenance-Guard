@@ -1183,3 +1183,65 @@ spread thinly across many people instead of dropped heavily on one.
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
+
+---
+
+## Capstone
+
+<!-- DRAFT OUTLINE (Claude). Each bold label is a section; fill in the TODOs. -->
+
+**System and What's New**
+
+TODO: Extending Provenance Guard (project 4). New this unit: per-request timing (`duration_ms`, plus `model_ms` / `style_ms`), input fields in every log line (`route`, `text_chars`, `words`), a gunicorn run path, and a cost measurement.
+
+**Shape**
+
+TODO: Shape A, deploy and instrument. Out of scope: detector accuracy, signal weights, labels, and rate-limit numbers. These stay exactly as they were in Unit 8. No hosting, because the model doesn't fit a free tier (see Run Path).
+
+**Run Path**
+
+TODO: Path B, local with logs. Command and environment in [RUNNING.md](RUNNING.md). Include the memory arithmetic: torch + gpt2 (~525 MB) > 512 MB free tier.
+
+**Instrumentation**
+
+TODO: Which fields each log line now has and why. Show one decision entry and one rejection entry.
+
+**Run Log**
+
+TODO: At least 10 real entries from `logs/audit.jsonl`, pasted as text from one session.
+
+**Cost Per Run**
+
+TODO: Measured, not estimated. Say how (for example, the median `duration_ms` over N warm requests, plus CPU seconds from `time.process_time()`). There's no API spend, so compute time is the cost.
+
+**Criteria**
+
+TODO: Link to `criteria.md` → Capstone criteria, with the commit hash that shows they came before the results.
+
+**Before: Results**
+
+TODO: 5 criteria × 3 trials, met or missed.
+
+**Verdicts and Diagnosis**
+
+TODO: For every miss, which part of the system caused it and how.
+
+**The Improvement**
+
+TODO: One change. Before and after results side by side.
+
+**After: Results**
+
+TODO
+
+**What's Left**
+
+TODO: What I'd do next and why I stopped.
+
+**How I Used AI**
+
+TODO: Disclose every Claude-drafted section, including this outline, the RUNNING.md capstone section, and `notes/capstone_criteria_topics.md`.
+
+**Stretch**
+
+TODO (optional, declare before starting): a latency breakdown is nearly free once `model_ms` / `style_ms` are logged.

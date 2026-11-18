@@ -1,5 +1,72 @@
 # Running Provenance Guard
 
+## Capstone: the run path (Path B, local with logs)
+
+> DRAFT. Verify every command from a clean `git clone` before submitting.
+> The starter's own guide continues below this section.
+
+**Why Path B:** the service loads `gpt2` (about 525 MB on disk) on top of `torch`.
+That's over a 512 MB free-tier host's memory before the first request arrives,
+and a free host would re-download the model after every idle spin-down.
+
+### Environment
+
+| Need | Value |
+|---|---|
+| Python | 3.13.7 (3.11–3.13 supported, **not** 3.14) |
+| OS tested | macOS (Darwin 25) |
+| Model | `gpt2`, about 525 MB, downloaded once to `~/.cache/huggingface/` |
+| Disk | about 2 GB total (torch + model) |
+| API keys | none |
+
+Pinned versions this was run with:
+
+```
+Flask==3.1.3
+Flask-Limiter==3.12
+gunicorn==23.0.0
+requests==2.34.2
+torch==2.15.0
+transformers==4.57.6
+certifi==2026.10.23
+```
+
+### One-time setup
+
+```bash
+git clone https://github.com/austin-stanley-hinson/Provenance-Guard.git
+cd Provenance-Guard
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python detector.py          # downloads gpt2 once (~525 MB)
+```
+
+### The one command that starts it
+
+```bash
+.venv/bin/gunicorn app:app --bind 127.0.0.1:5050 --workers 1 --timeout 120
+```
+
+- **Port 5050**, because port 5000 is taken by macOS AirPlay Receiver and returns 403.
+- **`--workers 1`**, because the rate limiter keeps counts in memory, so two workers would each keep their own count and double the effective limit.
+- **`--timeout 120`**, because the model loads on the first request, which can take longer than gunicorn's default 30 s timeout. A killed worker looks like the service is down.
+
+### Check it's alive
+
+```bash
+curl http://127.0.0.1:5050/health
+curl -X POST http://127.0.0.1:5050/submit -H "Content-Type: application/json" \
+  -d '{"creator_id":"smoke","text":"Paste a few sentences of real writing here so the detector has enough to judge."}'
+curl "http://127.0.0.1:5050/log?limit=3"
+```
+
+### Where the record lives
+
+Every request appends one JSON line to `logs/audit.jsonl`. The capstone run
+record is pasted into README → `## Capstone` → **Run Log**.
+
+---
+
 Everything about how the starter works.
 
 This is a **web service**. It runs on your machine and you talk to it with
