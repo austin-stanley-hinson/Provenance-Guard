@@ -24,7 +24,7 @@ import config
 
 PORT = 5050
 BASE = f"http://127.0.0.1:{PORT}"
-CMD = [".venv/bin/gunicorn", "app:app", "--bind", f"127.0.0.1:{PORT}",
+CMD = [".venv/bin/gunicorn", "app:app", "-c", "gunicorn.conf.py", "--bind", f"127.0.0.1:{PORT}",
        "--workers", "1", "--timeout", "120"]
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "results" / "capstone"

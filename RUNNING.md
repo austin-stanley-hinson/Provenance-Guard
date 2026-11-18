@@ -44,7 +44,7 @@ python detector.py          # downloads gpt2 once (~525 MB)
 ### The one command that starts it
 
 ```bash
-.venv/bin/gunicorn app:app --bind 127.0.0.1:5050 --workers 1 --timeout 120
+.venv/bin/gunicorn app:app -c gunicorn.conf.py --bind 127.0.0.1:5050 --workers 1 --timeout 120
 ```
 
 - **Port 5050**, because port 5000 is taken by macOS AirPlay Receiver and returns 403.
