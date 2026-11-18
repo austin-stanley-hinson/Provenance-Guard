@@ -1188,60 +1188,142 @@ spread thinly across many people instead of dropped heavily on one.
 
 ## Capstone
 
-<!-- DRAFT OUTLINE (Claude). Each bold label is a section; fill in the TODOs. -->
-
 **System and What's New**
 
-TODO: Extending Provenance Guard (project 4). New this unit: per-request timing (`duration_ms`, plus `model_ms` / `style_ms`), input fields in every log line (`route`, `text_chars`, `words`), a gunicorn run path, and a cost measurement.
+Extending Provenance Guard (project 4), the Flask service that labels a piece of writing as likely human, likely AI, or unsure. New this unit:
+
+- Every log line now records **what came in** (`route`, `bytes_in`, plus `text_chars` and `words` on decisions) and **how long it took** (`duration_ms` wall time and `cpu_ms` process CPU). Decisions also log `model_ms` and `style_ms` for the two signals.
+- Rate-limit rejections (429) are timed too. The timing hook is registered before Flask-Limiter, so the clock is running when it rejects.
+- The service runs under gunicorn, not Flask's development server, with one documented command.
+- `capstone_trial.py` runs one full trial: it starts the service fresh, sends a scripted batch, scores all five criteria from the log, and stops the service.
+- The improvement: `gunicorn.conf.py` loads gpt2 when the worker starts, and logs that load as a `startup` event.
 
 **Shape**
 
-TODO: Shape A, deploy and instrument. Out of scope: detector accuracy, signal weights, labels, and rate-limit numbers. These stay exactly as they were in Unit 8. No hosting, because the model doesn't fit a free tier (see Run Path).
+Shape A, deploy and instrument. Out of scope: detector accuracy, signal weights, labels, thresholds and rate-limit numbers. These are unchanged from Unit 8, and none of the capstone criteria measure them. No hosted deploy (see Run Path).
 
 **Run Path**
 
-TODO: Path B, local with logs. Command and environment in [RUNNING.md](RUNNING.md). Include the memory arithmetic: torch + gpt2 (~525 MB) > 512 MB free tier.
+Path B, local with logs. Command and environment are in [RUNNING.md](RUNNING.md):
+
+```bash
+.venv/bin/gunicorn app:app -c gunicorn.conf.py --bind 127.0.0.1:5050 --workers 1 --timeout 120
+```
+
+Why not hosted: torch (~200–800 MB) plus the gpt2 weights (525 MB on disk, loaded into RAM) is already over a 512 MB free tier before the first request. A free host would also re-download the model after every idle spin-down.
+
+Tested from a fresh `git clone` into an empty folder on 2026-11-17, following RUNNING.md step by step: no extra steps were needed, `/health` answered, and `/submit` returned a decision. Setup took about 50 s, but that's because pip's cache and the Hugging Face model cache were already on this machine. A truly new machine also downloads torch and about 525 MB of model.
 
 **Instrumentation**
 
-TODO: Which fields each log line now has and why. Show one decision entry and one rejection entry.
+| Field | On | Meaning |
+|---|---|---|
+| `timestamp` | every line | UTC, to the second |
+| `route` | every request | which endpoint was hit |
+| `bytes_in` | every request | request body size, which is "what came in" even when it was rejected |
+| `text_chars`, `words` | decisions | the size of the text actually scored (the text itself isn't logged) |
+| `guess`, scores, `label` / `reason`, `http_status` | decisions / rejections | what went out |
+| `duration_ms` | every request | wall time from request start until the log write |
+| `cpu_ms` | every request | process CPU time over the same span, which is the cost |
+| `model_ms`, `style_ms` | decisions | time spent in each signal |
+| `event: startup` | once per worker | how long loading gpt2 took (after the improvement) |
+
+`duration_ms` stops at the log write, just before the response is serialized. That last step is under a millisecond, so it's left out.
 
 **Run Log**
 
-TODO: At least 10 real entries from `logs/audit.jsonl`, pasted as text from one session.
+From after-trial 3, one real session, unedited (only the long `label` sentence is trimmed out of decision lines):
+
+```
+{"timestamp": "2026-11-18T03:08:10+00:00", "event": "startup", "status": "model_loaded", "route": null, "duration_ms": 2483.3, "cpu_ms": 2006.1}
+{"timestamp": "2026-11-18T03:08:11+00:00", "content_id": "5c8c5801-c6f2-4096-aa17-83cf92f3ebae", "creator_id": "cap-after-t3-cold", "guess": "unsure", "model_score": 0.5556, "style_score": 0.1403, "combined_score": 0.2649, "status": "decided", "text_chars": 823, "words": 154, "route": "/submit", "bytes_in": 870, "duration_ms": 173.3, "cpu_ms": 241.1, "model_ms": 170.9, "style_ms": 0.6}
+{"timestamp": "2026-11-18T03:08:11+00:00", "content_id": "f55f6176-34ca-47f4-b7a8-d053da987ff2", "creator_id": "cap-after-t3-warm0", "guess": "unsure", "model_score": 0.5556, "style_score": 0.1403, "combined_score": 0.2649, "status": "decided", "text_chars": 823, "words": 154, "route": "/submit", "bytes_in": 871, "duration_ms": 149.0, "cpu_ms": 204.3, "model_ms": 148.0, "style_ms": 0.4}
+{"timestamp": "2026-11-18T03:08:11+00:00", "content_id": "6c405f14-186e-4ea3-93cf-fa29ab3674b7", "creator_id": "cap-after-t3-warm1", "guess": "unsure", "model_score": 0.5556, "style_score": 0.1403, "combined_score": 0.2649, "status": "decided", "text_chars": 823, "words": 154, "route": "/submit", "bytes_in": 871, "duration_ms": 144.6, "cpu_ms": 199.7, "model_ms": 143.7, "style_ms": 0.4}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "invalid_json", "http_status": 400, "route": "/submit", "bytes_in": 10, "duration_ms": 0.2, "cpu_ms": 0.2}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "unknown", "event": "rejected", "status": "rejected", "reason": "invalid_json", "http_status": 400, "route": "/submit", "bytes_in": 10, "duration_ms": 0.1, "cpu_ms": 0.1}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "cap-after-t3-missing0", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400, "route": "/submit", "bytes_in": 39, "duration_ms": 0.1, "cpu_ms": 0.1}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "cap-after-t3-missing1", "event": "rejected", "status": "rejected", "reason": "missing_field", "http_status": 400, "route": "/submit", "bytes_in": 39, "duration_ms": 0.1, "cpu_ms": 0.1}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "cap-after-t3-long0", "event": "rejected", "status": "rejected", "reason": "text_too_long", "http_status": 413, "route": "/submit", "bytes_in": 10050, "duration_ms": 0.1, "cpu_ms": 0.1}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "cap-after-t3-long1", "event": "rejected", "status": "rejected", "reason": "text_too_long", "http_status": 413, "route": "/submit", "bytes_in": 10050, "duration_ms": 0.1, "cpu_ms": 0.1}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "cap-after-t3-flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "http_status": 429, "limit": "5 per 1 minute", "route": "/submit", "bytes_in": 871, "duration_ms": 0.2, "cpu_ms": 0.2}
+{"timestamp": "2026-11-18T03:08:13+00:00", "creator_id": "cap-after-t3-flood", "event": "rejected", "status": "rejected", "reason": "rate_limited", "http_status": 429, "limit": "5 per 1 minute", "route": "/submit", "bytes_in": 871, "duration_ms": 0.1, "cpu_ms": 0.1}
+```
+
+The full records for all six trials (25 lines each, plus startup) are in `results/capstone/*.json` and `logs/audit.jsonl`.
 
 **Cost Per Run**
 
-TODO: Measured, not estimated. Say how (for example, the median `duration_ms` over N warm requests, plus CPU seconds from `time.process_time()`). There's no API spend, so compute time is the cost.
+**One warm `/submit` of a ~150-word text costs about 0.17 CPU-seconds (median 160–181 ms CPU) and about 0.12 s of wall time (median 113–133 ms).** There's no API bill, so compute is the cost.
+
+How I measured it: `time.process_time()` and `time.perf_counter()` are read at the start of every request and again at the log write. The numbers above are the medians of 10 warm requests per trial, across all 6 trials (60 requests). CPU time is higher than wall time because torch scores on several threads at once. In practice, one core handles about 21,000 checks an hour.
+
+Loading the model is a separate, one-time cost of 2.0–2.2 CPU-seconds (2.5–3.4 s wall), logged by the `startup` event. A rejection costs about 0.1–0.3 ms, because it never reaches the model.
 
 **Criteria**
 
-TODO: Link to `criteria.md` → Capstone criteria, with the commit hash that shows they came before the results.
+Five criteria in [criteria.md](criteria.md) → *Capstone criteria*, committed and pushed in `3efa9b6` before any capstone code or run. The before-results are in `9373c27`, and the improvement and after-results are in `33570d1`.
 
 **Before: Results**
 
-TODO: 5 criteria × 3 trials, met or missed.
+Each trial starts the service fresh and sends 1 first `/submit`, 10 warm ones, and 8 bad requests (`python capstone_trial.py before N`).
+
+| Criterion | Target | Trial 1 | Trial 2 | Trial 3 | Verdict |
+|---|---|---|---|---|---|
+| 1 Warm latency (median) | ≤ 500 ms | 120.9 | 120.4 | 131.1 | **Met 3/3** |
+| 2 Cold start (first request) | ≤ 10,000 ms | 4,177.3 | 3,413.6 | 2,622.7 | **Met 3/3** |
+| 3 Cost (median CPU) | ≤ 1,000 ms | 170.3 | 170.1 | 180.7 | **Met 3/3** |
+| 4 Rejections logged, slowest | 8/8, ≤ 50 ms | 8/8, 0.3 | 8/8, 0.3 | 8/8, 0.3 | **Met 3/3** |
+| 5 Time accounted (worst) | ≥ 90% | 99.7% | 99.6% | 99.7% | **Met 3/3** |
 
 **Verdicts and Diagnosis**
 
-TODO: For every miss, which part of the system caused it and how.
+All five criteria were met in all three before-trials, so there are no misses to diagnose. What the numbers show:
+
+- **The model is the whole cost.** `model_ms` is 99.6–99.7% of every warm request. The style signal takes 0.4–0.6 ms. Any speed work has to go at gpt2.
+- **The cold start is where the time goes.** The first request is 20–35× slower than a warm one (2.6–4.2 s vs ~0.12 s). That's because `detector._load()` runs lazily inside the first `/submit`, so the first writer of every session pays for loading the model. It's under my 10 s target, but it's the largest number in the table. That made it the improvement.
+- **Rejections never touch the model**, so they cost about 0.1 ms. Input checks run before anything expensive, which is the order the route was built in.
 
 **The Improvement**
 
-TODO: One change. Before and after results side by side.
+**One change:** `gunicorn.conf.py` adds a `post_worker_init` hook that loads gpt2 when the worker starts and logs the load as an `event: startup` line. The run command gained `-c gunicorn.conf.py`. Nothing else changed.
+
+| Criterion | Before (t1 / t2 / t3) | After (t1 / t2 / t3) |
+|---|---|---|
+| 1 Warm latency median ms | 120.9 / 120.4 / 131.1 | 112.6 / 122.5 / 132.5 |
+| 2 First request ms | **4,177.3 / 3,413.6 / 2,622.7** | **1,181.5 / 200.5 / 173.3** |
+| 3 Median CPU ms | 170.3 / 170.1 / 180.7 | 160.7 / 170.1 / 181.4 |
+| 4 Rejections | 8/8, max 0.3 | 8/8, max 0.3 |
+| 5 Time accounted | 99.6–99.7% | 99.6–99.7% |
+| Model load (startup event) | inside first request | 3,381.6 / 2,750.2 / 2,483.3 ms at startup |
+
+The first request got 3.5–15× faster. The load cost didn't disappear; it moved to before anyone is waiting, and it's still visible in the log. Warm latency, cost and rejections didn't change, as expected, since the change only touches when the model loads.
 
 **After: Results**
 
-TODO
+All five criteria were met in 3/3 after-trials (`python capstone_trial.py after N`; raw results in `results/capstone/after_trial*.json`).
+
+One leftover: after-trial 1's first request still took 1,181.5 ms against about 190 ms in trials 2 and 3. The model was already loaded, so this is most likely torch's first forward pass setting up memory and threads the first time it runs after a fresh process start. Trials 2 and 3 ran right after it, with the OS file cache already warm. A single warm-up inference in the startup hook would most likely remove this; that would be the second improvement.
 
 **What's Left**
 
-TODO: What I'd do next and why I stopped.
+- **My targets were too easy.** All five were met with big margins before any change: warm latency was 4× under target, CPU 5–6×, and rejections more than 100×. I set them without having timed anything first, and the course says a target you can't miss doesn't test anything. I'm leaving the numbers as they were committed, not tightening them after the fact. If I wrote them again, I'd make the warm median ≤ 200 ms and the first request ≤ 500 ms, which are targets the before-run would actually have missed.
+- **A warm-up inference at startup** for the leftover first-pass cost described above.
+- **Longer texts:** every trial used one ~150-word text. Scoring time grows with tokens (up to `DETECTOR_MAX_TOKENS`), so a 1,500-word submission is untested.
+- **More than one worker:** the in-memory rate limiter means 1 worker is a requirement, not a choice. Scaling out needs shared storage like Redis for the limiter first.
+
+I stopped here because the extension (logging, the run path, cost measurement and one improvement) is complete and measured. The items above are each a separate change with their own before and after.
 
 **How I Used AI**
 
-TODO: Disclose every Claude-drafted section, including this outline, the RUNNING.md capstone section, and `notes/capstone_criteria_topics.md`.
+I used Claude Code for most of this unit, and here's exactly what it did:
+
+- **Choosing the project and shape:** Claude recommended Provenance Guard, shape A and path B, because the model doesn't fit a free host and the project was the freshest. I agreed.
+- **Criteria:** Claude gave me a menu of topics. **I picked the five topics; Claude proposed the numbers and the reasons; I approved them** before anything was run. They were committed as `3efa9b6`.
+- **Code:** Claude wrote the timing hook and fields in `app.py`, the `**extra` change in `audit.py`, `capstone_trial.py` and `gunicorn.conf.py`. It ran `test.py` (9/9 pass) and all six trials.
+- **Choosing the improvement:** Claude picked the cold-start change from the before-results, since it was the largest number.
+- **Writing:** Claude drafted the RUNNING.md capstone section and every section under this `## Capstone` heading.
+- **Where I checked it:** Claude caught that Flask-Limiter's check runs before route code, so a 429 would have had no start time unless the clock hook was registered first. Claude also caught that running more than one worker would split the rate limiter's in-memory counts.
 
 **Stretch**
 
-TODO (optional, declare before starting): a latency breakdown is nearly free once `model_ms` / `style_ms` are logged.
+None claimed, because none were declared before starting. A latency breakdown is in the log anyway (`model_ms` vs `style_ms`, above).
